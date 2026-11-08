@@ -117,8 +117,8 @@ body[data-theme="wine"] .felt{background:radial-gradient(ellipse at 50% 18%,#935
 <div id="onlineOptions" class="hidden">
 <div class="line"><label for="nickname">Ваше имя</label><input id="nickname" maxlength="18" placeholder="Например, Миша" value="Игрок"></div>
 <div class="actionrow"><button class="primary" id="createRoom">Создать комнату</button><button class="secondary" id="joinShow">Войти по коду</button></div>
-<div id="joinFields" class="hidden line"><label for="roomInput">Код комнаты</label><input id="roomInput" maxlength="12" placeholder="Например, ABC123"><button class="primary line" id="joinRoom" style="width:100%">Подключиться</button></div>
-<p class="hint">Онлайн использует WebRTC и бесплатный сервер связи PeerJS. Ведущий должен оставаться в игре; некоторые мобильные сети могут блокировать соединение.</p>
+<div id="joinFields" class="hidden line"><label for="roomInput">Код комнаты</label><input id="roomInput" maxlength="10" placeholder="Код из 10 символов"><button class="primary line" id="joinRoom" style="width:100%">Подключиться</button></div>
+<p class="hint">Бесплатный онлайн на 2–6 человек. Firebase подтверждает вход; сервер проверяет ходы, раздаёт карты и скрывает чужие руки даже от организатора. Держать компьютер ведущего включённым не нужно.</p>
 </div>
 <div id="soloStart" class="actionrow"><button class="primary" id="startSolo">▶ Начать партию</button></div>
 <div class="notice">В колоде 54 карты два джокера считаются самыми старшими козырями: красный старше чёрного. Это дополнительное домашнее правило, не классический вариант.</div>
@@ -594,20 +594,8 @@ function publicView(seat){
 }
 
 function updateAll(){
- if(!g)return;
- view=publicView(mode==='local'?g.current:0);
- if(mode==='online'&&onlineRole==='host'){
-  view=publicView(0);
-  for(const [id,conn] of connections){
-   if(!conn.open)continue;
-   const seat=roster.findIndex(p=>p.peerId===id);
-   if(seat>=0)conn.send({
-    type:'state',view:publicView(seat)
-   });
-  }
- }
- renderGame();
- if(mode!=='online'||onlineRole==='host')pumpBots();
+ if(!g||mode==='online')return;
+ view=publicView(mode==='local'?g.current:0);renderGame();pumpBots();
 }
 
 function updateRemote(v){view=v;renderGame()}
@@ -627,7 +615,7 @@ function legalActions(v,c){
     if(v.players[next].count>0)break;
    }
    if(next!==v.defender&&
-      v.table.length+1<=Math.min(6,v.players[next].count))
+      v.table.length+1<=Math.min(v.round===1?5:6,v.players[next].count))
     moves.push('transfer');
   }
  }
@@ -777,14 +765,13 @@ function renderGame(){
 }
 
 function submit(kind,cardId){
- if(mode==='online'&&onlineRole==='guest'){
-  if(hostConn?.open)
-   hostConn.send({type:'act',kind,cardId:cardId||null});
-  else notify('Нет соединения с ведущим');
-  return;
+ if(mode==='online'){
+  if(!netConnected)return notify('Нет связи. Ждём переподключения.');
+  return serverAction('move',{kind,cardId:cardId||'',gameId,revision});
  }
- const actor=g?.current;
- if(actor<0)return;
+ if(!g)return;
+ const actor=mode==='local'?g.current:0;
+ if(actor<0||actor!==g.current)return;
  tryMove(actor,kind,cardId);
 }
 
@@ -833,250 +820,91 @@ function setMode(m){
   'Всего игроков (вы + боты)':'Игроков на телефоне';
 }
 
-// Онлайн: ведущий хранит колоду и отправляет гостям только их карты.
+// Online authority lives on the server. Every seat receives exactly one private view.
+const SERVER_URL='https://durak-game-server.yaumirayu.workers.dev';
+const firebaseConfig={apiKey:'AIzaSyAW6BfKHQQpvqkI8x06rUCX4Xtjk4WN2_w',authDomain:'durak-game-74db6.firebaseapp.com',projectId:'durak-game-74db6',appId:'1:732583844754:web:f93e3f07aacc18e6a33f4b'};
+let fbPromise=null,pollTimer=null,pollBusy=false,requestBusy=false,netEpoch=0,netConnected=false,revision=0,gameId='',lastToken='';
+const sessionGet=k=>{try{return JSON.parse(sessionStorage.getItem(k)||'null')}catch{return null}};
+const sessionSet=(k,v)=>{try{if(v===null)sessionStorage.removeItem(k);else sessionStorage.setItem(k,JSON.stringify(v))}catch{}};
+function loadScript(src){return new Promise((resolve,reject)=>{
+ const tag=document.createElement('script');tag.src=src;tag.async=true;
+ const timer=setTimeout(()=>{tag.remove();reject(new Error('Не удалось загрузить Firebase. Проверьте сеть.'))},15000);
+ tag.onload=()=>{clearTimeout(timer);resolve()};tag.onerror=()=>{clearTimeout(timer);reject(new Error('Firebase недоступен в этой сети.'))};document.head.appendChild(tag);
+})}
+async function ensureFirebase(){
+ if(!SERVER_URL)throw new Error('Сервер игры ещё не опубликован.');
+ if(!fbPromise)fbPromise=(async()=>{
+  for(const product of ['app','auth'])if(product==='app'?!window.firebase:!firebase.auth)await loadScript('https://www.gstatic.com/firebasejs/12.5.0/firebase-'+product+'-compat.js');
+  if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+  await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
+  await new Promise(resolve=>{const off=firebase.auth().onAuthStateChanged(()=>{off();resolve()})});
+  if(!firebase.auth().currentUser)await firebase.auth().signInAnonymously();
+ })().catch(e=>{fbPromise=null;throw e});return fbPromise;
+}
+async function api(path,data={}){
+ lastToken=await firebase.auth().currentUser.getIdToken();
+ const response=await fetch(SERVER_URL+path,{method:'POST',headers:{Authorization:'Bearer '+lastToken,'Content-Type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(15000)});
+ const value=await response.json().catch(()=>({error:'Сервер временно недоступен.'}));
+ if(!response.ok)throw new Error(value.error||'Ошибка сервера');return value;
+}
+function nickname(){return ($('nickname').value.trim()||'Игрок').slice(0,18)}
 function closePeer(){
- clearTimeout(autoTimer);
- if(hostConn){
-  try{hostConn.close()}catch{}
-  hostConn=null;
- }
- for(const c of connections.values())
-  try{c.close()}catch{}
- connections.clear();
- if(peer){try{peer.destroy()}catch{}peer=null}
- onlineRole='';roster=[];room='';
+ clearTimeout(autoTimer);clearTimeout(endingTimer);clearTimeout(pollTimer);
+ if(room&&lastToken)fetch(SERVER_URL+'/room/'+room+'/leave',{method:'POST',headers:{Authorization:'Bearer '+lastToken,'Content-Type':'application/json'},body:'{}',keepalive:true}).catch(()=>{});
+ netEpoch++;pollBusy=false;requestBusy=false;netConnected=false;onlineRole='';roster=[];room='';
+ sessionSet('durak-online-v3',null);
 }
-
-function friendlyError(err){
- let type=err?.type||'';
- return type==='unavailable-id'?
-  'Код занят. Попробуйте создать новую комнату.':
-  type==='peer-unavailable'?
-  'Комната не найдена или ведущий отключился.':
-  'Ошибка соединения: '+(err?.message||'попробуйте снова');
-}
-
-function roomCode(){
- const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
- const a=new Uint8Array(7);
- if(window.crypto?.getRandomValues)crypto.getRandomValues(a);
- else a.forEach((_,i)=>a[i]=Math.random()*256);
- return Array.from(a,x=>chars[x%chars.length]).join('');
-}
-
-function nickname(){
- return ($('nickname').value.trim()||'Игрок').slice(0,18);
-}
-
-// PeerJS загружается только при выборе онлайна.
-let peerLibraryPromise=null;
-function ensurePeer(){
- if(typeof window.Peer==='function')return Promise.resolve();
- if(peerLibraryPromise)return peerLibraryPromise;
- const urls=[
-  'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js',
-  'https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js'
- ];
- peerLibraryPromise=new Promise((resolve,reject)=>{
-  let i=0;
-  function attempt(){
-   if(i>=urls.length){
-    reject(new Error('Не удалось загрузить PeerJS. Проверьте интернет.'));
-    return;
-   }
-   let finished=false;
-   let tag=document.createElement('script');
-   const timer=setTimeout(()=>done(false),8000);
-   function done(ok){
-    if(finished)return;
-    finished=true;clearTimeout(timer);
-    tag.onload=tag.onerror=null;
-    if(ok&&typeof window.Peer==='function')resolve();
-    else{tag.remove();attempt()}
-   }
-   tag.async=true;
-   tag.src=urls[i++];
-   tag.onload=()=>done(true);
-   tag.onerror=()=>done(false);
-   document.head.appendChild(tag);
-  }
-  attempt();
- }).catch(e=>{
-  peerLibraryPromise=null;
-  throw e;
- });
- return peerLibraryPromise;
-}
-
 async function onlineStart(kind){
  const b=$(kind==='host'?'createRoom':'joinRoom');
- if(kind==='guest'&&$('roomInput').value.trim().length<5){
-  notify('Введите код комнаты');return;
- }
- b.disabled=true;
- const previous=b.textContent;
- b.textContent='Подключаем…';
+ const code=$('roomInput').value.trim().toUpperCase();
+ if(kind==='guest'&&!/^[A-Z2-9]{10}$/.test(code))return notify('Введите код из 10 символов.');
+ b.disabled=true;const label=b.textContent;b.textContent='Подключаем…';
  try{
-  await ensurePeer();
-  if(kind==='host')createRoom();
-  else joinRoom();
- }catch(e){
-  notify('Онлайн недоступен: '+e.message+
-   ' Одиночный и локальный режимы работают без этого сервиса.');
- }finally{
-  b.disabled=false;b.textContent=previous;
- }
+  await ensureFirebase();closePeer();g=null;view=null;mode='online';
+  if(kind==='host')room=(await api('/create',{name:nickname(),variant:$('variant').value,deckSize:Number($('deckSize').value)})).room;
+  else room=code;
+  const state=await api('/room/'+room+'/join',{name:nickname()});
+  sessionSet('durak-online-v3',{room});applyOnline(state);poll();
+ }catch(e){netConnected=false;notify(e.message)}finally{b.disabled=false;b.textContent=label}
 }
+function applyOnline(state){
+ const previousRole=onlineRole,hadError=!!netError;
+ netConnected=true;netError='';room=state.room;onlineRole=state.organizer?'host':'guest';roster=state.players;
+ revision=state.revision;gameId=state.gameId;$('variant').value=state.variant;$('deckSize').value=String(state.deckSize);
+ if(state.view){
+  const v=state.view;v.table=v.table||[];v.hand=v.hand||[];v.passed=v.passed||[];
+  // Keep card focus and animations stable while polling unchanged positions.
+  if(!view||view.gameId!==v.gameId||view.revision!==v.revision||previousRole!==onlineRole||hadError)updateRemote(v);
+ }else updateWaiting();
+}
+async function poll(){
+ clearTimeout(pollTimer);const epoch=netEpoch;
+ if(!room||pollBusy)return;pollBusy=true;
+ try{const state=await api('/room/'+room+'/state');if(epoch===netEpoch)applyOnline(state)}
+ catch(e){if(epoch===netEpoch){netConnected=false;notify('Нет связи: '+e.message+' Повторяем подключение…')}}
+ finally{if(epoch===netEpoch){pollBusy=false;pollTimer=setTimeout(poll,document.hidden?10000:3000)}}
+}
+function updateWaiting(){
+ show('waiting');$('roomCode').textContent=room;$('waitingInfo').textContent='Комната на бесплатном сервере. Колода и чужие руки скрыты от всех игроков, включая организатора.';
+ $('roomPlayers').innerHTML=roster.map((p,i)=>'<div class="seat">'+esc(p.name)+'<b>Игрок '+(i+1)+(p.online?' · в сети':' · нет связи')+'</b></div>').join('');
+ $('launchOnline').classList.toggle('hidden',onlineRole!=='host');$('launchOnline').disabled=roster.length<2||!netConnected;
+ $('roomNotice').textContent='Игроков: '+roster.length+' из 6. Если организатор отключится, его роль перейдёт активному игроку через минуту. Комната действует 24 часа.';
+}
+async function serverAction(action,data={}){
+ if(requestBusy||!room)return;requestBusy=true;const epoch=netEpoch;
+ try{const state=await api('/room/'+room+'/'+action,data);if(epoch===netEpoch)applyOnline(state)}
+ catch(e){if(epoch===netEpoch){notify(e.message);poll()}}
+ finally{if(epoch===netEpoch)requestBusy=false}
+}
+function startOnlineAgain(){return serverAction('start')}
+async function restoreOnline(){
+ const saved=sessionGet('durak-online-v3');if(!saved?.room)return;
+ try{await ensureFirebase();mode='online';setMode('online');room=saved.room;g=null;view=null;
+  applyOnline(await api('/room/'+room+'/join',{name:nickname()}));poll();
+ }catch(e){sessionSet('durak-online-v3',null);room='';onlineRole='';show('menu');notify(e.message)}
+}
+document.addEventListener('visibilitychange',()=>{if(room&&!document.hidden)poll()});
 
-function createRoom(){
- if(typeof Peer!=='function')
-  return notify('Библиотека соединения не загрузилась.');
- closePeer();mode='online';onlineRole='host';
- room=roomCode();
- roster=[{name:nickname(),peerId:'HOST'}];
- peer=new Peer('durak6-'+room.toLowerCase());
- show('waiting');
- updateWaiting('Создаём комнату…');
- peer.on('open',()=>{
-  updateWaiting('Комната создана. Пригласите друзей.');
- });
- peer.on('connection',c=>{
-  connections.set(c.peer,c);
-  c.on('data',m=>handleHostMessage(c,m));
-  c.on('close',()=>dropGuest(c));
-  c.on('error',()=>dropGuest(c));
- });
- peer.on('error',e=>{
-  notify(friendlyError(e));
-  updateWaiting(friendlyError(e));
- });
-}
-
-function dropGuest(conn){
- connections.delete(conn.peer);
- const i=roster.findIndex(p=>p.peerId===conn.peer);
- if(!g){
-  if(i>0)roster.splice(i,1);
-  updateWaiting('Игрок отключился.');
-  broadcastLobby();
- }else if(i>=0){
-  g.players[i].bot=true;
-  roster[i].bot=true;
-  g.msg=roster[i].name+' отключился, его карты переданы боту.';
-  updateAll();
- }
-}
-
-function handleHostMessage(c,m){
- if(!m||typeof m!=='object')return;
- if(m.type==='join'&&!g){
-  if(roster.find(p=>p.peerId===c.peer)){
-   c.send({type:'error',message:'Вы уже в комнате'});
-   return;
-  }
-  if(roster.length>=6){
-   c.send({type:'error',message:'В комнате уже шесть игроков'});
-   return;
-  }
-  let name=String(m.name||'Игрок').trim().slice(0,18)||'Игрок';
-  roster.push({name,peerId:c.peer});
-  c.send({type:'joined',seat:roster.length-1,room});
-  updateWaiting(name+' присоединился!');
-  broadcastLobby();
- }
- else if(m.type==='act'&&g){
-  const i=roster.findIndex(p=>p.peerId===c.peer);
-  if(i>=0&&!g.players[i].bot&&
-     ['lead','defend','transfer','take','toss','pass'].includes(m.kind)&&
-     (!m.cardId||typeof m.cardId==='string'))
-   tryMove(i,m.kind,m.cardId);
- }
- else if(m.type==='join')
-  c.send({type:'error',message:'Игра уже началась'});
-}
-
-function broadcastLobby(){
- for(const c of connections.values())
-  if(c.open)c.send({
-   type:'lobby',
-   players:roster.map(p=>p.name),
-   variant:$('variant').value,
-   deckSize:Number($('deckSize').value)
-  });
-}
-
-function updateWaiting(s){
- show('waiting');
- $('roomCode').textContent=room;
- $('waitingInfo').textContent=s||'Ожидаем игроков…';
- $('roomPlayers').innerHTML=roster.map((p,i)=>
-  '<div class="seat">'+esc(p.name)+
-  '<b>Игрок '+(i+1)+'</b></div>'
- ).join('');
- $('launchOnline').classList.toggle('hidden',onlineRole!=='host');
- $('launchOnline').disabled=roster.length<2;
- $('roomNotice').textContent='Подключено '+roster.length+
-  ' из 6. Правила: '+
-  ($('variant').value==='transfer'?'переводной':'подкидной')+
-  ', '+$('deckSize').value+' карт.';
-}
-
-function joinRoom(){
- if(typeof Peer!=='function')
-  return notify('Не удалось загрузить библиотеку PeerJS.');
- const code=$('roomInput').value.trim().toUpperCase()
-  .replace(/[^A-Z2-9]/g,'');
- if(code.length<5)return notify('Введите код комнаты');
- closePeer();mode='online';onlineRole='guest';room=code;
- show('waiting');
- $('roomCode').textContent=code;
- $('waitingInfo').textContent='Подключаемся к ведущему…';
- $('roomPlayers').innerHTML='';
- $('launchOnline').classList.add('hidden');
- peer=new Peer();
- peer.on('open',()=>{
-  hostConn=peer.connect('durak6-'+code.toLowerCase(),{
-   reliable:true
-  });
-  hostConn.on('open',()=>
-   hostConn.send({type:'join',name:nickname()})
-  );
-  hostConn.on('data',handleGuestMessage);
-  hostConn.on('close',()=>
-   notify('Ведущий отключился. Вернитесь в меню.')
-  );
-  hostConn.on('error',e=>notify(friendlyError(e)));
- });
- peer.on('error',e=>notify(friendlyError(e)));
-}
-
-function handleGuestMessage(m){
- if(!m||typeof m!=='object')return;
- if(m.type==='joined')
-  $('waitingInfo').textContent=
-   'Вы в комнате! Ожидаем начала игры.';
- if(m.type==='lobby'){
-  $('roomPlayers').innerHTML=m.players.map((p,i)=>
-   '<div class="seat">'+esc(p)+
-   '<b>Игрок '+(i+1)+'</b></div>'
-  ).join('');
-  $('roomNotice').textContent=
-   'Подключено '+m.players.length+
-   ' из 6. Ведущий начнёт партию.';
- }
- if(m.type==='state')updateRemote(m.view);
- if(m.type==='error')notify(m.message);
-}
-
-function startOnlineAgain(){
- if(onlineRole!=='host')return;
- g=null;
- startEngine(
-  roster.map(p=>({name:p.name,bot:!!p.bot})),
-  $('variant').value,Number($('deckSize').value),
-  $('level').value
- );
-}
 
 function copyInvite(){
  const url=location.href.split('#')[0]+'#room='+room;
@@ -1100,6 +928,7 @@ function exit(){
  clearTimeout(endingTimer);
  closePeer();
  g=null;view=null;localRevealed=-1;
+ $('privacy').classList.add('hidden');
  show('menu');
 }
 
@@ -1164,7 +993,8 @@ if(linkCode){
 renderPrefs();
 setMode(linkCode?'online':'bot');
 $('bootStatus').textContent=
- '✅ Готово! Игра запускается без загрузки сторонних библиотек. Онлайн подключается отдельно.';
+ '✅ Готово · Серверный онлайн v3. Боты и локальная игра доступны без Firebase.';
+restoreOnline();
 
 })();
 </script>

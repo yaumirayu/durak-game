@@ -1,0 +1,6 @@
+{
+  "name": "durak-game",
+  "private": true,
+  "scripts": {"test": "node tests/server.test.mjs"},
+  "engines": {"node": ">=22"}
+}
