@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c3b2d">
+<meta name="description" content="Подкидной дурак — карточная игра против компьютера. 36 карт, козыри, уровни сложности.">
+<title>Подкидной дурак ♠ — карточная игра</title>
+<style>
+:root{color-scheme:dark;--bg:#071d19;--panel:#0c3028;--felt-light:#226f55;--felt:#10523e;--felt-dark:#083528;--felt-ring:#ad7942;--gold:#f4d08c;--cream:#fff9ef;--ink:#2f343c;--muted:#b5cfc4;--edge:#ffffff25;--red:#ca3442;--green:#3ee0a5;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse 140% 95% at 50% -15%,#285e48 0%,#0b2b24 40%,#071d19 100%);color:#f7f5e9;padding:calc(13px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));overflow-x:hidden}
+button,select{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}button:disabled{cursor:default}button:focus-visible,select:focus-visible{outline:3px solid #f8d78e;outline-offset:3px}
+#game{max-width:590px;margin:0 auto;--card-w:67px;--card-h:97px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 3px 12px}
+.titleblock{display:flex;gap:9px;align-items:center;min-width:0}
+.logo{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#efc67b,#b07d45);color:#193c30;font-size:23px;box-shadow:inset 0 1px 2px #fff5,0 3px 9px #0004}
+h1{font-size:clamp(19px,5.4vw,25px);letter-spacing:-.7px;line-height:1.1;margin:0;font-weight:900;white-space:nowrap}
+.kicker{margin-top:4px;font-size:11px;color:#c4dacf}
+.top-actions{display:flex;gap:7px}
+.difficulty-top{display:flex;align-items:center;gap:9px;padding:9px 11px;margin:0 0 12px;border:1px solid #ffffff27;background:#ffffff0b;border-radius:14px}
+.difficulty-top-label{font-weight:800;font-size:12px;color:#e0eddf;white-space:nowrap}
+.quick-difficulty{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;flex:1;min-width:0;border-radius:10px;padding:3px;background:#051b16b9}
+.quick-difficulty button{background:transparent;border:0;color:#d5e9db;border-radius:8px;padding:9px 3px;font-weight:780;font-size:12px;white-space:nowrap}
+.quick-difficulty button[aria-pressed="true"]{background:#f4d08c;color:#263c2e;box-shadow:0 2px 7px #0005}
+@media(max-width:380px){.difficulty-top-label{font-size:11px}.quick-difficulty button{font-size:11px;padding:9px 1px}}
+.iconbutton{border:1px solid #ffffff30;background:#ffffff14;color:#f7f5e9;border-radius:12px;min-width:42px;height:42px;display:grid;place-items:center;font-size:20px;transition:background .18s,transform .18s}
+.iconbutton:active{transform:scale(.94);background:#ffffff29}
+.board{position:relative;background:radial-gradient(ellipse at 44% 25%,var(--felt-light) 0,var(--felt) 55%,var(--felt-dark) 100%);border:5px solid var(--felt-ring);border-radius:25px;box-shadow:inset 0 0 0 2px #f6ce8370,inset 0 0 50px #001b164b,0 18px 42px #0007;overflow:hidden;padding:12px 13px 14px}
+.board::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.12;background-image:repeating-linear-gradient(70deg,transparent 0,transparent 3px,#ffffff0a 4px,#0000001a 5px);mix-blend-mode:overlay}
+.board>*{position:relative}
+.opponent{height:67px;display:flex;justify-content:space-between;align-items:center;gap:9px;border-bottom:1px solid var(--edge);padding:0 2px 9px}
+.opponent-title{min-width:120px;font-weight:800;font-size:14px}
+.opponent-title small{display:block;font-weight:550;font-size:11px;color:#c0dccd;margin-top:3px}
+.enemy-cards{flex:1;display:flex;align-items:center;justify-content:flex-end;overflow:hidden;min-width:0;height:62px;padding-right:2px}
+.back{height:54px;width:39px;border:2px solid #fff7e6;flex:0 0 39px;border-radius:6px;position:relative;margin-left:-25px;box-shadow:0 2px 6px #0008;background:repeating-linear-gradient(45deg,#243f76 0,#243f76 5px,#447bc0 5px,#447bc0 9px,#203760 9px,#203760 13px);animation:deal-bot .35s backwards;animation-delay:calc(var(--i)*40ms)}
+.back:first-child{margin-left:0}.back::after{content:"♠";position:absolute;inset:4px;border:1px solid #ffffffaa;border-radius:3px;display:grid;place-items:center;color:#f6e9d2;font-size:21px;text-shadow:0 2px 3px #0009}
+.info{display:grid;grid-template-columns:76px minmax(0,1fr) 70px;gap:5px;align-items:center;min-height:84px;padding:8px 0;border-bottom:1px solid var(--edge)}
+.deck{display:flex;flex-direction:column;align-items:flex-start;gap:3px;font-size:10px;color:#d8e6d7}
+.deck-layer{position:relative;width:67px;height:55px}
+.deck-back{position:absolute;left:7px;top:0;height:52px;width:38px;border-radius:5px;border:2px solid #fff3df;box-shadow:0 2px 6px #0009;background:repeating-linear-gradient(45deg,#243f76 0,#243f76 5px,#447bc0 5px,#447bc0 9px);z-index:2;transform:rotate(-7deg)}
+.deck-bottom{position:absolute;left:19px;top:8px;width:37px;height:50px;border:2px solid #e9e0ce;background:#fffaf0;border-radius:5px;transform:rotate(76deg);font-size:17px;font-weight:900;display:grid;place-items:center;color:#2e3540;z-index:1}
+.status{min-width:0;text-align:center}.status-strong{font-size:clamp(15px,3.9vw,19px);font-weight:850;letter-spacing:-.35px;color:#ffe5a3}.status-hint{font-size:11px;line-height:1.35;color:#d9f2e0;margin-top:4px}
+.trump{text-align:center;font-size:10px;color:#d4e9d8;letter-spacing:.8px}.trump-badge{background:#fffaf0;border-radius:10px;border:2px solid #f2e8d2;box-shadow:0 3px 8px #0005;width:51px;height:51px;display:grid;place-items:center;font-size:32px;color:#2d3641;margin:5px auto 0}.red{color:var(--red)!important}
+.table-wrap{position:relative}
+.table{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-content:center;justify-items:center;gap:5px 1px;min-height:226px;padding:15px 0 12px;transition:opacity .33s,transform .33s}
+.table.empty-table{background:radial-gradient(ellipse at center,#ffffff08 0%,transparent 60%)}
+.table-message{grid-column:1/-1;align-self:center;display:flex;flex-direction:column;align-items:center;gap:6px;color:#d0ead0a8;text-align:center;font-size:13px;font-weight:550}.table-message b{font-size:34px;font-weight:400;opacity:.7}
+.pair{width:112px;height:120px;position:relative}.pair .card{position:absolute;width:70px;height:99px;pointer-events:none}.pair .card.attack{top:1px;left:6px;transform:rotate(-9deg);animation:attack-in .34s both}.pair .card.defense{top:19px;left:39px;transform:rotate(9deg);animation:defense-in .36s both}.pair-marker{position:absolute;left:8px;bottom:0;font-size:10px;color:#f0f3de8a}.pending-dot{position:absolute;left:86px;top:1px;border-radius:50%;background:#f6d283;color:#4a3420;font-weight:900;width:22px;height:22px;display:grid;place-items:center}
+.table-wrap.clearing-beat .table{opacity:0;transform:translateY(-36px) scale(.92)}.table-wrap.clearing-take .table{opacity:0;transform:translateY(45px) scale(.92)}
+.round-banner{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:29px;font-weight:950;letter-spacing:.3px;color:#ffdf91;text-shadow:0 3px 10px #002c25;animation:flash-banner .5s both}.round-banner[hidden]{display:none}
+.card{--rank:#313846;display:flex;align-items:center;justify-content:center;border:2px solid #f7efe1;border-radius:9px;background:linear-gradient(135deg,#fffefb 0%,#fffaf0 54%,#fff0dc 100%);position:relative;color:var(--rank);box-shadow:0 3px 7px #0006,inset 0 1px 2px #fff;overflow:hidden;flex:0 0 var(--card-w);width:var(--card-w);height:var(--card-h);isolation:isolate;user-select:none}
+.card::before{content:"";position:absolute;inset:3px;border:1px solid #c4b18b55;border-radius:5px;pointer-events:none}.card.card-red{--rank:#c93644}
+.card .corner{position:absolute;left:6px;top:5px;display:flex;align-items:center;flex-direction:column;font-size:15px;line-height:.95;font-weight:900;color:var(--rank)}.card .corner i{font-size:13px;font-style:normal;margin-top:2px}.card .corner.bottom{left:auto;top:auto;right:6px;bottom:5px;transform:rotate(180deg)}
+.card .pip{font-size:34px;line-height:1;text-shadow:0 1px 0 #fff6;color:var(--rank)}.card .micro{position:absolute;inset:0;display:grid;place-items:center;font-size:57px;opacity:.085;color:var(--rank)}
+.card .court{display:grid;place-items:center;border:1px solid #d9ba79a8;border-radius:7px;width:40px;height:57px;background:linear-gradient(135deg,#fffaf2 0%,#f9ead0 100%);position:relative;color:var(--rank)}.card .court::before,.card .court::after{content:"✦";position:absolute;color:#c89e50;font-size:9px;left:4px;top:3px}.card .court::after{left:auto;right:4px;top:auto;bottom:3px}.card .court-royal{font-size:24px;font-weight:900;line-height:1;position:relative;z-index:1}.card .court-suit{font-size:20px;line-height:1;opacity:.92}
+.controls{display:flex;gap:8px;align-items:stretch}.main-action{width:100%;min-height:51px;border:none;border-radius:13px;background:linear-gradient(135deg,#ffe4a5,#e8ba64);color:#2b4032;font-size:14px;font-weight:850;box-shadow:0 3px 0 #aa8245;transition:filter .15s,transform .15s}.main-action:not(:disabled):active{transform:translateY(2px);box-shadow:0 1px 0 #aa8245}.main-action:disabled{opacity:.48;box-shadow:none}.message{margin-top:10px;text-align:center;min-height:32px;font-size:12px;color:#e2f3e6;line-height:1.4}
+.handbar{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:15px 3px 5px}.hand-title{font-size:15px;font-weight:800}.hand-tip{font-size:11px;color:#c3dbcd;text-align:right;line-height:1.2}
+.hand-scroll{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:#ffffff55 transparent;padding:10px 0 9px;-webkit-overflow-scrolling:touch}.hand-inner{display:flex;align-items:flex-start;justify-content:safe center;min-width:100%;width:max-content;padding:7px 4px 0;min-height:114px}
+.hand-inner .card{margin-left:var(--hand-gap,-9px);transition:transform .17s ease,box-shadow .17s ease;touch-action:manipulation}.hand-inner .card:first-child{margin-left:0}.hand-inner .card.legal{box-shadow:0 0 0 2px #48dfa6,0 5px 8px #0008;transform:translateY(-6px);cursor:pointer}.hand-inner .card.legal:active{transform:translateY(-12px) scale(1.025)}.hand-inner .card.illegal{opacity:.66;filter:saturate(.78);cursor:default}.hand-inner.dealing .card{animation:deal-hand .37s backwards;animation-delay:calc(var(--i)*55ms)}
+.bottom-note{color:#a6c3b8;font-size:11px;text-align:center;margin-top:3px;line-height:1.4}.stats-bar{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:#c0d8cc}.stats-bar span{border:1px solid #ffffff1a;background:#ffffff09;border-radius:30px;padding:6px 10px}
+.end-card{margin:10px 0 0;background:linear-gradient(130deg,#284d3b,#154335);border:1px solid #cfb87580;border-radius:15px;padding:15px;text-align:center;animation:modal-in .28s both}.end-card[hidden]{display:none}.end-card strong{font-size:22px;color:#ffe2a4;display:block}.end-card p{font-size:12px;color:#c6dec9;margin:6px 0 0}
+.modal-shell{position:fixed;inset:0;z-index:30;padding:18px;display:flex;align-items:center;justify-content:center;background:#00150fc9;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}.modal-shell[hidden]{display:none}.modal{border-radius:21px;border:1px solid #d3b77980;background:linear-gradient(155deg,#173d32,#0e2a24);color:#f6faef;padding:20px;max-width:420px;width:100%;max-height:calc(100vh - 42px);overflow:auto;box-shadow:0 22px 75px #000a;animation:modal-in .22s both}.modal-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.modal h2{font-size:22px;margin:0}.modal .close{width:37px;height:37px;border-radius:10px;background:#ffffff15;color:#fff;border:1px solid #ffffff24;font-size:22px;flex:0 0 37px}.modal label{font-size:13px;color:#d5e5d6;font-weight:750;display:block;margin:20px 0 7px}.modal select{width:100%;min-height:45px;border-radius:12px;border:1px solid #ffffff44;background:#315849;color:#fff;padding:10px 11px;font-size:15px}.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.theme-choice{background:#ffffff10;color:#f5f8ef;border:1px solid #ffffff37;border-radius:11px;padding:9px 5px;font-size:11px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:6px}.theme-choice[aria-pressed=true]{border-color:#f6d58d;background:#ffffff25}.theme-swatch{width:36px;height:26px;border:2px solid #cda56c;border-radius:8px}.switchrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:19px}.switchrow label{margin:0}.toggle{background:#ffffff2d;color:white;border:1px solid #ffffff3a;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:850;min-width:94px}.toggle[aria-pressed=true]{background:#217f5f;border-color:#6ddda9}.fineprint{margin-top:19px;color:#b9d1c0;font-size:11px;line-height:1.55}
+.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:17px}.stat-item{border:1px solid #ffffff25;border-radius:14px;padding:13px;background:#ffffff0b}.stat-number{display:block;font-size:26px;font-weight:900;color:#f9dda8}.stat-label{color:#c5dacb;font-size:11px;margin-top:2px}.statfoot{font-size:12px;color:#c7ddcd;margin:14px 0 4px}.danger{margin-top:17px;width:100%;color:#ffe1de;background:#8b393744;border:1px solid #eb8f8380;padding:11px;border-radius:12px;font-weight:750;font-size:12px}
+body[data-felt="blue"]{--bg:#0b1c32;--felt-light:#256b80;--felt:#164961;--felt-dark:#0b304b;--felt-ring:#b68a55;background:radial-gradient(ellipse 140% 95% at 50% -15%,#235676,#091f36 60%,#06192d 100%)}body[data-felt="burgundy"]{--bg:#26141d;--felt-light:#845063;--felt:#623348;--felt-dark:#3f2032;--felt-ring:#c39960;background:radial-gradient(ellipse 140% 95% at 50% -15%,#663e4f,#24161c 60%,#1b1217 100%)}
+@keyframes deal-hand{from{opacity:0;transform:translate(40px,-95px) rotate(14deg) scale(.75)}to{opacity:1;transform:translate(0,0) rotate(0) scale(1)}}
+@keyframes deal-bot{from{opacity:0;transform:translate(-50px,70px) rotate(-35deg)}to{opacity:1;transform:translate(0,0) rotate(0)}}
+@keyframes attack-in{from{opacity:.4;transform:translateY(65px) rotate(-20deg) scale(.8)}to{opacity:1;transform:rotate(-9deg)}}
+@keyframes defense-in{from{opacity:.35;transform:translateY(-65px) rotate(25deg) scale(.8)}to{opacity:1;transform:rotate(9deg)}}
+@keyframes flash-banner{0%{opacity:0;transform:scale(.65)}35%{opacity:1;transform:scale(1.1)}100%{opacity:0;transform:scale(1.02)}}
+@keyframes modal-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+@media(max-width:420px){#game{--card-w:62px;--card-h:91px}.board{padding:10px 9px 12px}.pair{width:96px;height:109px}.pair .card{width:62px;height:89px}.pair .card.defense{left:32px;top:18px}.pending-dot{left:76px}.table{min-height:193px;gap:3px 0}.card .pip{font-size:31px}.card .court{width:37px;height:52px}.card .court-royal{font-size:21px}.hand-inner{min-height:105px}.titleblock{gap:7px}.logo{width:37px;height:37px}.opponent-title{min-width:103px}.back{margin-left:-26px}}
+@media(max-width:345px){.pair{width:84px;height:102px}.pair .card{width:57px;height:81px}.pair .card.defense{left:27px;top:18px}.pending-dot{left:66px}.table{min-height:181px}.info{grid-template-columns:63px minmax(0,1fr) 56px}.deck-layer{transform:scale(.88);transform-origin:left center}.trump-badge{width:44px;height:46px}.trump{font-size:9px}.opponent-title{font-size:12px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body data-felt="green">
+<main id="game">
+ <header>
+  <div class="titleblock"><div class="logo" aria-hidden="true">♠</div><div><h1>Подкидной дурак</h1><div class="kicker">36 карт · один на один с ботом</div></div></div>
+  <div class="top-actions"><button type="button" id="statsOpen" class="iconbutton" aria-label="Статистика" title="Статистика">🏆</button><button type="button" id="settingsOpen" class="iconbutton" aria-label="Настройки" title="Настройки">⚙️</button><button type="button" id="newGame" class="iconbutton" aria-label="Новая партия" title="Новая партия">↻</button></div>
+ </header>
+ <section class="difficulty-top" aria-label="Быстрый выбор сложности"><span class="difficulty-top-label">🧠 Сложность</span><div class="quick-difficulty" id="quickDifficulty" role="group" aria-label="Сложность компьютера"><button type="button" data-quick-difficulty="easy" aria-pressed="false">Лёгкая</button><button type="button" data-quick-difficulty="normal" aria-pressed="true">Средняя</button><button type="button" data-quick-difficulty="hard" aria-pressed="false">Сложная</button></div></section>
+ <section class="board" aria-label="Игровой стол">
+  <div class="opponent"><div class="opponent-title">🤖 Компьютер<small id="botCount">6 карт</small></div><div class="enemy-cards" id="enemyCards"></div></div>
+  <div class="info">
+   <div class="deck" id="deckDisplay"></div>
+   <div class="status"><div class="status-strong" id="statusText">Раздаём карты…</div><div class="status-hint" id="statusHint">Начинаем партию</div></div>
+   <div class="trump">КОЗЫРЬ<div class="trump-badge" id="trumpSuit">♠</div></div>
+  </div>
+  <div class="table-wrap" id="tableWrap"><div class="table" id="tableCards"></div><div class="round-banner" id="roundBanner" hidden>БИТО!</div></div>
+  <div class="controls"><button type="button" class="main-action" id="action" disabled>Выберите карту</button></div>
+  <div class="message" id="message" aria-live="polite"></div>
+ </section>
+ <section class="end-card" id="endCard" hidden aria-live="polite"><strong id="endTitle"></strong><p id="endCaption"></p></section>
+ <div class="handbar"><div class="hand-title">🙋 Ваши карты <span id="humanCount">(6)</span></div><div class="hand-tip" id="handHint">Нажмите на карту</div></div>
+ <div class="hand-scroll" id="handScroll"><div class="hand-inner" id="humanHand"></div></div>
+ <div class="bottom-note">Касайтесь подсвеченных карт · длинную руку можно листать вбок</div>
+ <div class="stats-bar"><span id="scoreWins">🏆 Побед: 0</span><span id="scoreLosses">💔 Поражений: 0</span><span id="scoreStreak">🔥 Серия: 0</span></div>
+</main>
+<div class="modal-shell" id="settingsModal" hidden role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+ <div class="modal"><div class="modal-header"><h2 id="settingsTitle">⚙️ Настройки</h2><button class="close" id="settingsClose" aria-label="Закрыть настройки">×</button></div>
+  <label for="difficulty">Сложность соперника</label><select id="difficulty"><option value="easy">Лёгкая — дружелюбный бот</option><option value="normal">Обычная — разумная игра</option><option value="hard">Сложная — бережёт козыри</option></select>
+  <label>Оформление стола</label><div class="choices" id="themeChoices"><button type="button" class="theme-choice" data-theme="green"><span class="theme-swatch" style="background:#175940"></span>Изумрудный</button><button type="button" class="theme-choice" data-theme="blue"><span class="theme-swatch" style="background:#164c66"></span>Синий</button><button type="button" class="theme-choice" data-theme="burgundy"><span class="theme-swatch" style="background:#643a4f"></span>Бордовый</button></div>
+  <div class="switchrow"><label for="soundToggle">🔊 Звуки карт и результатов</label><button type="button" id="soundToggle" class="toggle" aria-pressed="true">Включены</button></div>
+  <div class="fineprint">Настройки и статистика сохраняются в этом браузере, если Safari разрешает локальное хранение данных. Для комфортной игры на iPhone можно добавить сайт на экран «Домой».</div>
+ </div>
+</div>
+<div class="modal-shell" id="statsModal" hidden role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+ <div class="modal"><div class="modal-header"><h2 id="statsTitle">🏆 Статистика</h2><button class="close" id="statsClose" aria-label="Закрыть статистику">×</button></div><div class="statgrid" id="statsGrid"></div><div class="statfoot" id="statsFoot"></div><button type="button" class="danger" id="clearStats">Сбросить статистику</button></div>
+</div>
+<script>
+(()=>{'use strict';
+ const $=id=>document.getElementById(id);
+ const SUITS=['♣','♦','♥','♠'],FACES={11:'В',12:'Д',13:'К',14:'Т'};
+ const SETTINGS_KEY='durak-site-settings-v3', STATS_KEY='durak-site-stats-v3';
+ const red=s=>s==='♥'||s==='♦', name=c=>String(FACES[c.r]||c.r)+c.s;
+ const rnd=n=>Math.floor(Math.random()*n);
+ const read=(key)=>{try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}};
+ const persist=(key,obj)=>{try{localStorage.setItem(key,JSON.stringify(obj))}catch(e){}};
+ const defaultSettings={difficulty:'normal',theme:'green',sound:true};
+ const storedSettings=read(SETTINGS_KEY)||{};
+ const settings={...defaultSettings,...storedSettings};
+ if(!['easy','normal','hard'].includes(settings.difficulty))settings.difficulty='normal';
+ if(!['green','blue','burgundy'].includes(settings.theme))settings.theme='green';
+ settings.sound=!!settings.sound;
+ const defaultStats={wins:0,losses:0,draws:0,streak:0,bestStreak:0,fastestWin:null,totalRounds:0};
+ let stats={...defaultStats,...(read(STATS_KEY)||{})};
+ // Миграция статистики из предыдущей версии (если новой ещё нет).
+ if(!read(STATS_KEY)){
+  const old=read('durak-fixed-record')||read('durak-chat-record-v2');
+  if(old&&Number.isFinite(old.human))stats.wins=old.human;
+  if(old&&Number.isFinite(old.bot))stats.losses=old.bot;
+  if(old&&Number.isFinite(old.draw))stats.draws=old.draw;
+  persist(STATS_KEY,stats);
+ }
+ let game=null,gameToken=0,timers=[],audioCtx=null,dealing=false;
+ function later(fn,ms){const token=gameToken;const tid=setTimeout(()=>{if(token===gameToken)fn()},ms);timers.push(tid)}
+ function stopTimers(){for(const t of timers)clearTimeout(t);timers=[];}
+ function sound(type){
+  if(!settings.sound)return;
+  try{
+   const Ctx=window.AudioContext||window.webkitAudioContext;
+   if(!Ctx)return;
+   if(!audioCtx)audioCtx=new Ctx();
+   if(audioCtx.state==='suspended')audioCtx.resume().catch(()=>{});
+   const now=audioCtx.currentTime;
+   const patterns={card:[[0,620,.055],[.06,460,.06]],deal:[[0,440,.035],[.065,490,.035]],beat:[[0,620,.08],[.10,860,.10]],take:[[0,340,.09],[.13,245,.12]],win:[[0,523,.13],[.16,659,.13],[.32,784,.24]],lose:[[0,392,.15],[.18,330,.16],[.38,260,.25]],draw:[[0,520,.12],[.16,520,.12]]};
+   for(const [delay,freq,duration] of (patterns[type]||patterns.card)){
+    const o=audioCtx.createOscillator(),gain=audioCtx.createGain();o.type=type==='win'?'sine':'triangle';o.frequency.setValueAtTime(freq,now+delay);gain.gain.setValueAtTime(.0001,now+delay);gain.gain.exponentialRampToValueAtTime(.07,now+delay+.012);gain.gain.exponentialRampToValueAtTime(.0001,now+delay+duration);o.connect(gain);gain.connect(audioCtx.destination);o.start(now+delay);o.stop(now+delay+duration+.01);
+   }
+  }catch(e){}
+ }
+ function makeDeck(){const d=[];for(const s of SUITS)for(let r=6;r<=14;r++)d.push({s,r,id:s+r});for(let i=d.length-1;i>0;i--){const j=rnd(i+1);[d[i],d[j]]=[d[j],d[i]]}return d}
+ function lowestTrump(hand,trump){const arr=hand.filter(c=>c.s===trump).map(c=>c.r);return arr.length?Math.min(...arr):99}
+ function startGame(){
+  stopTimers();gameToken++;dealing=true;
+  let d,h,b,t,hs,bs;
+  do{d=makeDeck();h=[];b=[];for(let i=0;i<6;i++){h.push(d.pop());b.push(d.pop())}t=d[0].s;hs=lowestTrump(h,t);bs=lowestTrump(b,t)}while(hs===99&&bs===99);
+  game={human:h,bot:b,deck:d,trump:t,table:[],limit:6,attacker:null,defender:null,phase:'init',message:'Новая партия! Найдите подсвеченные карты.',winner:null,round:0};
+  beginRound(hs<bs?'human':'bot');render();sound('deal');later(()=>{dealing=false;$('humanHand').classList.remove('dealing')},1050);
+ }
+ function order(hand){return [...hand].sort((a,b)=>Number(a.s===game.trump)-Number(b.s===game.trump)||a.r-b.r||SUITS.indexOf(a.s)-SUITS.indexOf(b.s))}
+ function beats(def,atk){return (def.s===atk.s&&def.r>atk.r)||(def.s===game.trump&&atk.s!==game.trump)}
+ function ranks(){const r=new Set();for(const p of game.table){r.add(p.attack.r);if(p.defense)r.add(p.defense.r)}return r}
+ function unanswered(){return game.table.find(p=>!p.defense)}
+ function canPlay(c){
+  if(!game)return false;
+  if(game.phase==='humanAttack'||game.phase==='botTaking')return game.table.length<game.limit&&(game.table.length===0||ranks().has(c.r));
+  if(game.phase==='humanDefense')return !!unanswered()&&beats(c,unanswered().attack);
+  return false;
+ }
+ function pull(who,card){const h=game[who];const i=h.findIndex(c=>c.id===card.id);if(i<0)throw Error('Card missing from '+who+': '+card.id);return h.splice(i,1)[0]}
+ function refill(who){while(game[who].length<6&&game.deck.length)game[who].push(game.deck.pop())}
+ function finishIfOver(){
+  if(game.deck.length)return false;
+  let winner=null;
+  if(!game.human.length&&!game.bot.length)winner='draw';
+  else if(!game.human.length)winner='human';
+  else if(!game.bot.length)winner='bot';
+  if(!winner)return false;
+  game.phase='over';game.winner=winner;
+  if(winner==='human'){stats.wins++;stats.streak++;stats.bestStreak=Math.max(stats.bestStreak,stats.streak);stats.fastestWin=stats.fastestWin===null?game.round:Math.min(stats.fastestWin,game.round);game.message='Все карты сброшены. Вы победили!';sound('win')}
+  if(winner==='bot'){stats.losses++;stats.streak=0;game.message='Карты закончились у бота. Попробуйте ещё раз!';sound('lose')}
+  if(winner==='draw'){stats.draws++;stats.streak=0;game.message='У обоих игроков закончились карты одновременно.';sound('draw')}
+  persist(STATS_KEY,stats);return true;
+ }
+ function beginRound(who){
+  game.attacker=who;game.defender=who==='human'?'bot':'human';game.table=[];game.limit=Math.min(6,game[game.defender].length);game.round++;
+  if(finishIfOver())return;
+  if(who==='human'){game.phase='humanAttack';game.message='Ваш ход. Выберите карту, чтобы атаковать.'}
+  else{
+   game.phase='botLeadThinking';game.message='Компьютер выбирает карту для атаки…';
+   later(botLead,470);
+  }
+ }
+ function botLead(){
+  if(game.phase!=='botLeadThinking')return;
+  const c=chooseBotLead();if(!c){finishIfOver();render();return}
+  game.table.push({attack:pull('bot',c),defense:null});game.phase='humanDefense';
+  game.message='Бот пошёл '+name(c)+'. Отбейте карту или возьмите.';sound('card');render();
+ }
+ function chooseBotLead(){
+  const hand=game.bot,remaining=game.deck.length;
+  const scored=hand.map(c=>{
+   const matching=hand.filter(v=>v.r===c.r).length;
+   let cost=c.r*1.35+(c.s===game.trump?(remaining?23:12):0)-matching*1.5;
+   if(settings.difficulty==='easy')cost+=Math.random()*40;
+   if(settings.difficulty==='normal')cost+=Math.random()*5;
+   if(settings.difficulty==='hard'){cost+=Math.random()*1.8;if(c.r>=13)cost+=3}
+   return {c,cost};
+  });return scored.sort((a,b)=>a.cost-b.cost)[0]?.c;
+ }
+ function botDefense(attack){
+  const opts=order(game.bot.filter(c=>beats(c,attack)));
+  if(!opts.length)return null;
+  const remaining=game.deck.length;
+  const weighted=opts.map(c=>{
+   const tr=c.s===game.trump;
+   let cost=c.r+(tr?(attack.s===game.trump?3:26):0);
+   if(settings.difficulty==='hard')cost+=tr&&remaining>0?8:0;
+   if(settings.difficulty==='easy')cost+=Math.random()*33;
+   return {c,cost};
+  }).sort((a,b)=>a.cost-b.cost);
+  const choice=weighted[0].c;
+  const isTrumpForNormal=choice.s===game.trump&&attack.s!==game.trump;
+  if(settings.difficulty==='hard'&&isTrumpForNormal&&remaining>7&&choice.r>=11&&game.bot.length<=4&&game.table.length<=2)return null;
+  if(settings.difficulty==='normal'&&isTrumpForNormal&&remaining>13&&choice.r>=13&&game.bot.length<4)return null;
+  if(settings.difficulty==='easy'&&Math.random()<.16&&game.bot.length>2)return null;
+  return choice;
+ }
+ function botRespond(){
+  if(game.phase!=='botDefenseThinking')return;
+  const p=unanswered();if(!p)return;
+  const defending=botDefense(p.attack);
+  if(!defending){
+   game.phase='botTaking';game.message='Компьютер решил взять карты. Можете подкинуть.';
+   sound('take');render();
+   if(!game.human.some(canPlay))later(()=>endRound(true),650);
+   return;
+  }
+  p.defense=pull('bot',defending);game.phase='humanAttack';
+  game.message='Бот отбил '+name(p.attack)+' картой '+name(defending)+'. Подкиньте или нажмите «Бито».';
+  sound('card');render();
+  if(!game.human.some(canPlay))later(()=>endRound(false),700);
+ }
+ function botTossCandidates(){const present=ranks();return order(game.bot.filter(c=>present.has(c.r)))}
+ function chooseBotToss(taking){
+  if(game.table.length>=game.limit)return null;
+  const opts=botTossCandidates();if(!opts.length)return null;
+  const rem=game.deck.length;
+  let usable=opts.filter(c=>c.s!==game.trump);
+  if(!usable.length){
+   if(settings.difficulty==='hard'&&rem>0)return null;
+   if(settings.difficulty==='normal'&&rem>0)return null;
+   usable=opts;
+  }
+  const c=usable[0];
+  if(taking)return c;
+  if(settings.difficulty==='easy')return Math.random()<.46?c:null;
+  if(settings.difficulty==='normal')return (c.r<=12||rem===0||game.human.length<=2)?c:(Math.random()<.45?c:null);
+  // Не тратить старшие карты, если положение бота не улучшится.
+  if(c.r>=13&&rem>0&&game.human.length>=4)return null;
+  return c;
+ }
+ function botAfterBlock(){
+  if(game.phase!=='botTossThinking')return;
+  const c=chooseBotToss(false);
+  if(!c)return endRound(false);
+  game.table.push({attack:pull('bot',c),defense:null});game.phase='humanDefense';
+  game.message='Бот подкинул '+name(c)+'. Отбейте или возьмите.';sound('card');render();
+ }
+ function botTossBeforeTake(){
+  if(game.phase!=='botTossThinking')return;
+  let added=0;
+  while(game.table.length<game.limit){
+   const c=chooseBotToss(true);if(!c)break;
+   game.table.push({attack:pull('bot',c),defense:null});added++;
+   if(settings.difficulty==='easy'&&added>=1)break;
+  }
+  sound('take');render();later(()=>endRound(true),added?450:260);
+ }
+ function endRound(took){
+  if(!game||game.phase==='over'||game.phase==='roundTransition')return;
+  if(!game.table.length)return;
+  if(!took&&game.table.some(p=>!p.defense))return;
+  game.phase='roundTransition';game.message=took?(game.defender==='human'?'Вы берёте карты.':'Бот берёт карты.'):'Карты уходят в отбой.';
+  $('roundBanner').hidden=false;$('roundBanner').textContent=took?'ВЗЯТО':'БИТО!';
+  $('tableWrap').classList.add(took?'clearing-take':'clearing-beat');
+  sound(took?'take':'beat');render();
+  later(()=>{
+   const attacker=game.attacker,defender=game.defender;
+   if(took)for(const p of game.table){game[defender].push(p.attack);if(p.defense)game[defender].push(p.defense)}
+   // Побитые карты больше не участвуют в партии.
+   refill(attacker);refill(defender);game.table=[];stats.totalRounds++;persist(STATS_KEY,stats);
+   $('tableWrap').classList.remove('clearing-take','clearing-beat');$('roundBanner').hidden=true;
+   if(finishIfOver()){render();return}
+   beginRound(took?attacker:defender);render();
+  },520);
+ }
+ function humanPlay(id){
+  if(!game)return;
+  const c=game.human.find(v=>v.id===id);if(!c)return;
+  if(!canPlay(c))return;
+  if(game.phase==='humanDefense'){
+   unanswered().defense=pull('human',c);game.phase='botTossThinking';game.message='Карта отбита. Компьютер думает, подкидывать ли…';sound('card');render();later(botAfterBlock,540);return;
+  }
+  const isTaking=game.phase==='botTaking';
+  game.table.push({attack:pull('human',c),defense:null});sound('card');
+  if(isTaking){
+   game.message='Вы подкинули '+name(c)+'. Компьютер берёт.';render();
+   if(!game.human.some(canPlay))later(()=>endRound(true),600);
+   return;
+  }
+  game.phase='botDefenseThinking';game.message='Компьютер думает, чем отбиться…';render();later(botRespond,510);
+ }
+ function mainAction(){
+  if(!game)return;
+  if(game.phase==='over')return startGame();
+  if(game.phase==='humanDefense'){
+   game.phase='botTossThinking';game.message='Вы берёте карты. Бот может подкинуть…';render();later(botTossBeforeTake,490);return;
+  }
+  if(game.phase==='botTaking')return endRound(true);
+  if(game.phase==='humanAttack'&&game.table.length&&game.table.every(p=>p.defense))return endRound(false);
+ }
+ function cardHTML(c,extra='',interactive=false,idx=0){
+  const rank=FACES[c.r]||c.r, isCourt=c.r>=11&&c.r<=13;
+  const center=isCourt?'<div class="court"><span class="court-royal">'+rank+'</span><span class="court-suit">'+c.s+'</span></div>':'<span class="micro">'+c.s+'</span><span class="pip">'+c.s+'</span>';
+  const attr=interactive?' type="button" data-id="'+c.id+'" aria-label="'+rank+' '+({"♠":"пик","♥":"червей","♦":"бубен","♣":"треф"}[c.s])+'" aria-disabled="'+(!canPlay(c))+'"':'';
+  const tag=interactive?'button':'div';
+  return '<'+tag+attr+' class="card '+(red(c.s)?'card-red ':'')+extra+'" style="--i:'+idx+'"><span class="corner">'+rank+'<i>'+c.s+'</i></span>'+center+'<span class="corner bottom">'+rank+'<i>'+c.s+'</i></span></'+tag+'>';
+ }
+ function render(){
+  if(!game)return;
+  const phase=game.phase;
+  const titles={humanAttack:'⚔️ Ваш ход',humanDefense:'🛡️ Защита',botDefenseThinking:'🤖 Бот думает',botTossThinking:'🤖 Бот думает',botLeadThinking:'🤖 Ход бота',botTaking:'📥 Бот берёт',roundTransition:'✨ Конец раунда',over:game.winner==='human'?'🏆 Победа!':game.winner==='bot'?'💔 Поражение':'🤝 Ничья'};
+  const hints={humanAttack:'Атакуйте или подкиньте',humanDefense:'Отбейте или возьмите',botTaking:'Подкиньте или завершите',botDefenseThinking:'Подождите ответ',botTossThinking:'Компьютер выбирает ход',botLeadThinking:'Компьютер атакует',roundTransition:'Подготовка следующего хода',over:'Можно сыграть снова'};
+  $('statusText').textContent=titles[phase]||'Новая партия';$('statusHint').textContent=hints[phase]||'';
+  $('botCount').textContent=game.bot.length+' карт';
+  const enemyCount=Math.min(game.bot.length,14);
+  $('enemyCards').innerHTML=Array.from({length:enemyCount},(_,i)=>'<div class="back" style="--i:'+i+'"></div>').join('');
+  const d=game.deck.length;
+  $('deckDisplay').innerHTML=d?'<div class="deck-layer"><div class="deck-bottom" style="color:'+(red(game.trump)?'#c93644':'#303a43')+'">'+game.trump+'</div><div class="deck-back"></div></div><span>Колода: '+d+'</span>':'<span style="font-size:12px;font-weight:750">Колода<br>пуста</span>';
+  $('trumpSuit').textContent=game.trump;$('trumpSuit').classList.toggle('red',red(game.trump));
+  $('tableCards').classList.toggle('empty-table',!game.table.length);
+  $('tableCards').innerHTML=game.table.length?game.table.map((p,i)=>'<div class="pair">'+cardHTML(p.attack,'attack')+(p.defense?cardHTML(p.defense,'defense'):'<div class="pending-dot">?</div>')+'<div class="pair-marker">'+(i+1)+' / '+game.limit+'</div></div>').join(''):'<div class="table-message"><b>♠ ♥ ♦ ♣</b><span>Ожидаем первый ход</span></div>';
+  const hand=order(game.human);
+  $('humanHand').style.setProperty('--hand-gap',hand.length>12?'-23px':hand.length>8?'-16px':'-9px');
+  $('humanHand').classList.toggle('dealing',dealing);
+  $('humanHand').innerHTML=hand.map((c,i)=>cardHTML(c,canPlay(c)?'legal':'illegal',true,i)).join('')||'<span style="color:#a6c9b9;font-size:13px;padding:30px">У вас нет карт</span>';
+  $('humanCount').textContent='('+game.human.length+')';
+  $('handHint').textContent=phase==='humanDefense'?'Подсвечены карты для отбоя':phase==='botTaking'?'Можно подкинуть':phase==='humanAttack'?'Подсвечены доступные карты':phase==='over'?'Партия окончена':'Ход компьютера';
+  const action=$('action');action.disabled=false;
+  if(phase==='humanAttack'){action.textContent=game.table.length?'✓ Бито — завершить ход':'Сначала выберите карту';action.disabled=!game.table.length}
+  else if(phase==='humanDefense')action.textContent='📥 Взять карты';
+  else if(phase==='botTaking')action.textContent='📥 Завершить подкидывание';
+  else if(phase==='over')action.textContent='↻ Сыграть снова';
+  else{action.textContent='Ход компьютера…';action.disabled=true}
+  $('message').textContent=game.message;
+  $('scoreWins').textContent='🏆 Побед: '+stats.wins;$('scoreLosses').textContent='💔 Поражений: '+stats.losses;$('scoreStreak').textContent='🔥 Серия: '+stats.streak;
+  $('endCard').hidden=phase!=='over';
+  if(phase==='over'){
+   $('endTitle').textContent=game.winner==='human'?'🎉 Вы выиграли!':game.winner==='bot'?'💔 В этот раз победил бот':'🤝 Ничья';
+   $('endCaption').textContent=game.message+' Сыграно раундов: '+game.round+'.';
+  }
+ }
+ function openModal(id){$(id).hidden=false;const btn=$(id).querySelector('.close');if(btn)btn.focus()}
+ function closeModal(id){$(id).hidden=true}
+ function applySettings(){
+  document.body.dataset.felt=settings.theme;
+  $('difficulty').value=settings.difficulty;
+  document.querySelectorAll('[data-quick-difficulty]').forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.quickDifficulty===settings.difficulty)));
+  $('soundToggle').setAttribute('aria-pressed',String(settings.sound));
+  $('soundToggle').textContent=settings.sound?'Включены':'Выключены';
+  document.querySelectorAll('[data-theme]').forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.theme===settings.theme)));
+  persist(SETTINGS_KEY,settings);
+ }
+ function renderStats(){
+  const games=stats.wins+stats.losses+stats.draws;
+  const cells=[['Партий',games],['Побед',stats.wins],['Поражений',stats.losses],['Ничьих',stats.draws],['Текущая серия',stats.streak],['Лучшая серия',stats.bestStreak],['Раундов всего',stats.totalRounds],['Быстрая победа',stats.fastestWin===null?'—':stats.fastestWin+' раунд.']];
+  $('statsGrid').innerHTML=cells.map(([label,value])=>'<div class="stat-item"><span class="stat-number">'+value+'</span><div class="stat-label">'+label+'</div></div>').join('');
+  $('statsFoot').textContent=games?'Доля побед: '+Math.round(100*stats.wins/games)+'% всех партий.':'Первая победа ещё впереди!';
+ }
+ $('newGame').addEventListener('click',()=>{if(game&&game.phase!=='over'&&!confirm('Начать новую партию? Текущая игра будет прервана.'))return;startGame()});
+ $('action').addEventListener('click',mainAction);
+ $('humanHand').addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(btn)humanPlay(btn.dataset.id)});
+ $('settingsOpen').addEventListener('click',()=>{applySettings();openModal('settingsModal')});
+ $('settingsClose').addEventListener('click',()=>closeModal('settingsModal'));
+ $('statsOpen').addEventListener('click',()=>{renderStats();openModal('statsModal')});
+ $('statsClose').addEventListener('click',()=>closeModal('statsModal'));
+ $('difficulty').addEventListener('change',e=>{settings.difficulty=e.target.value;applySettings()});
+ $('quickDifficulty').addEventListener('click',e=>{const btn=e.target.closest('button[data-quick-difficulty]');if(!btn)return;settings.difficulty=btn.dataset.quickDifficulty;applySettings()});
+ $('themeChoices').addEventListener('click',e=>{const btn=e.target.closest('button[data-theme]');if(btn){settings.theme=btn.dataset.theme;applySettings()}});
+ $('soundToggle').addEventListener('click',()=>{settings.sound=!settings.sound;applySettings();if(settings.sound)sound('card')});
+ $('clearStats').addEventListener('click',()=>{if(!confirm('Удалить все сохранённые результаты?'))return;stats={...defaultStats};persist(STATS_KEY,stats);renderStats();render()});
+ for(const modal of ['settingsModal','statsModal'])$(modal).addEventListener('click',e=>{if(e.target===$(modal))closeModal(modal)});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal('settingsModal');closeModal('statsModal')}});
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&audioCtx?.state==='running')audioCtx.suspend().catch(()=>{})});
+ applySettings();startGame();
+})();
+</script>
+</body>
+</html>
